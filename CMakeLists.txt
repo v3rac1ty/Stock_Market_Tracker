@@ -1,92 +1,109 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 project(StockMarketTracker VERSION 1.0.0 LANGUAGES CXX)
-
-# Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Find required packages
-find_package(CURL REQUIRED)
-find_package(nlohmann_json 3.2.0 QUIET)
+include(FetchContent)
 
-# If nlohmann_json is not found via find_package, use FetchContent as a fallback
-if(NOT nlohmann_json_FOUND)
-  include(FetchContent)
-  FetchContent_Declare(
+# GLFW
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    glfw
+    GIT_REPOSITORY https://github.com/glfw/glfw.git
+    GIT_TAG 3.4
+)
+FetchContent_MakeAvailable(glfw)
+
+# ImGui
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG v1.91.6
+)
+FetchContent_MakeAvailable(imgui)
+
+find_package(OpenGL REQUIRED)
+
+add_library(imgui_lib STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(imgui_lib PUBLIC
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+)
+target_link_libraries(imgui_lib PUBLIC glfw OpenGL::GL)
+
+# ImPlot
+FetchContent_Declare(
+    implot
+    GIT_REPOSITORY https://github.com/epezent/implot.git
+    GIT_TAG v0.17
+)
+FetchContent_MakeAvailable(implot)
+
+add_library(implot_lib STATIC
+    ${implot_SOURCE_DIR}/implot.cpp
+    ${implot_SOURCE_DIR}/implot_items.cpp
+)
+target_include_directories(implot_lib PUBLIC ${implot_SOURCE_DIR})
+target_link_libraries(implot_lib PUBLIC imgui_lib)
+
+# nlohmann_json
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.2  # Specify a version/tag
-  )
-  FetchContent_MakeAvailable(nlohmann_json)
+    GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# Catch2
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.7.1
+)
+FetchContent_MakeAvailable(Catch2)
+
+# Use pre-built MinGW curl at C:/curl-mingw if present (no system install)
+if(WIN32 AND EXISTS "C:/curl-mingw/include/curl/curl.h")
+    set(CURL_INCLUDE_DIR "C:/curl-mingw/include" CACHE PATH "" FORCE)
+    set(CURL_LIBRARY    "C:/curl-mingw/lib/libcurl.dll.a" CACHE FILEPATH "" FORCE)
 endif()
+find_package(CURL REQUIRED)
 
-# Source files
-set(SOURCES
+add_executable(StockTracker
     src/main.cpp
-    src/stock_data.cpp
-    src/stock_tracker.cpp
     src/yahoo_provider.cpp
+    src/stock_tracker.cpp
 )
-
-# Define the executable
-add_executable(stock_market_tracker ${SOURCES})
-
-# Include directories
-target_include_directories(stock_market_tracker 
-    PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CURL_INCLUDE_DIRS}
-)
-
-# Link libraries
-target_link_libraries(stock_market_tracker
-    PRIVATE
-    ${CURL_LIBRARIES}
+target_include_directories(StockTracker PRIVATE include)
+target_link_libraries(StockTracker PRIVATE
+    imgui_lib
+    implot_lib
+    glfw
+    OpenGL::GL
+    CURL::libcurl
     nlohmann_json::nlohmann_json
 )
 
-# Compiler warnings
-if(MSVC)
-    target_compile_options(stock_market_tracker PRIVATE /W4)
-else()
-    target_compile_options(stock_market_tracker PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
-# Install configuration
-install(TARGETS stock_market_tracker DESTINATION bin)
-
-# Add README.md to show in IDE
-set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT stock_market_tracker)
-
-# Set build configurations
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
-
-# Output directory configuration
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
-
-# Debug configurations
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    if(MSVC)
-        target_compile_options(stock_market_tracker PRIVATE /Od /Zi)
-    else()
-        target_compile_options(stock_market_tracker PRIVATE -O0 -g)
+if(WIN32)
+    target_link_libraries(StockTracker PRIVATE opengl32)
+    if(EXISTS "C:/curl-mingw/bin/libcurl-x64.dll")
+        add_custom_command(TARGET StockTracker POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "C:/curl-mingw/bin/libcurl-x64.dll"
+                $<TARGET_FILE_DIR:StockTracker>
+        )
     endif()
 endif()
 
-# Release configurations
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    if(MSVC)
-        target_compile_options(stock_market_tracker PRIVATE /O2)
-    else()
-        target_compile_options(stock_market_tracker PRIVATE -O3)
-    endif()
-endif()
-
-# Print configuration info
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
-message(STATUS "CURL Found: ${CURL_FOUND}")
-message(STATUS "nlohmann_json Found: ${nlohmann_json_FOUND}")
+enable_testing()
+add_subdirectory(tests)

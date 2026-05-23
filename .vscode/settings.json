@@ -1,5 +1,6 @@
 {
     "files.associations": {
         "condition_variable": "cpp"
-    }
+    },
+    "C_Cpp.default.compilerPath": "C:/mingw64/bin/g++.exe"
 }

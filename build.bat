@@ -1,25 +1,35 @@
 @echo off
-echo Building Stock Market Tracker...
+REM Build script for StockMarketTracker CMake project (Windows)
 
-if not exist build mkdir build
-cd build
+setlocal enabledelayedexpansion
 
-cmake -G "Visual Studio 16 2019" -A x64 ..
-if %ERRORLEVEL% neq 0 (
-    echo CMake configuration failed
-    exit /b %ERRORLEVEL%
+REM Default build type
+set BUILD_TYPE=Release
+
+REM Accept optional first argument for build type
+if not "%1"=="" (
+    set BUILD_TYPE=%1
 )
 
-cmake --build . --config Release
-if %ERRORLEVEL% neq 0 (
-    echo Build failed
-    exit /b %ERRORLEVEL%
+echo [*] Building StockMarketTracker with CMake
+echo [*] Build type: %BUILD_TYPE%
+
+REM Configure
+echo [*] Configuring CMake...
+cmake -B build -DCMAKE_BUILD_TYPE=%BUILD_TYPE%
+if errorlevel 1 (
+    echo [ERROR] CMake configuration failed
+    exit /b 1
 )
 
-echo Build completed successfully
-echo Executable location: %~dp0\build\bin\Release\stock_market_tracker.exe
-echo.
-echo To run the application:
-echo %~dp0\build\bin\Release\stock_market_tracker.exe
+REM Build
+echo [*] Building...
+cmake --build build --config %BUILD_TYPE% -j
+if errorlevel 1 (
+    echo [ERROR] Build failed
+    exit /b 1
+)
 
-cd ..
+echo [OK] Build succeeded
+echo [*] Output directory: build\
+exit /b 0

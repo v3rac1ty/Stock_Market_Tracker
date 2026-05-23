@@ -1,22 +1,34 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Build script for StockMarketTracker CMake project (Linux/macOS)
+
 set -e
 
-echo "Building Stock Market Tracker..."
+# Default build type
+BUILD_TYPE="Release"
 
-# Create build directory if it doesn't exist
-mkdir -p build
-cd build
+# Accept optional first argument for build type
+if [[ -n "$1" ]]; then
+    BUILD_TYPE="$1"
+fi
+
+# Detect OS and get CPU count
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    NUM_JOBS=$(sysctl -n hw.ncpu)
+else
+    NUM_JOBS=$(nproc)
+fi
+
+echo "[*] Building StockMarketTracker with CMake"
+echo "[*] Build type: $BUILD_TYPE"
+echo "[*] Parallel jobs: $NUM_JOBS"
 
 # Configure
-cmake .. -DCMAKE_BUILD_TYPE=Release
+echo "[*] Configuring CMake..."
+cmake -B build -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
 
 # Build
-cmake --build . -j$(nproc)
+echo "[*] Building..."
+cmake --build build -- -j"$NUM_JOBS"
 
-echo "Build completed successfully"
-echo "Executable location: $(pwd)/bin/stock_market_tracker"
-echo ""
-echo "To run the application:"
-echo "$(pwd)/bin/stock_market_tracker"
-
-cd ..
+echo "[OK] Build succeeded"
+echo "[*] Output directory: build/"
